@@ -20,7 +20,12 @@ It reports all problems in one pass instead of stopping at the first one.
 
 ```
 $ csvdoctor orders.csv
+$ csvdoctor --delimiter ';' orders.csv
+$ csvdoctor --delimiter '\t' orders.tsv
 ```
+
+The delimiter defaults to a comma. It must be a single character; pass
+`\t` literally (backslash-t) to scan tab-separated files.
 
 Given a file like this:
 
@@ -70,5 +75,5 @@ No dependencies outside the standard library.
 
 ## Status
 
-Early. The field-count baseline always comes from the first row and the
-delimiter is always a comma; see the issues for planned flags.
+Early. The field-count baseline always comes from the first row; see the
+issues for planned flags.

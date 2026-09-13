@@ -15,23 +15,21 @@ type csvError struct {
 	msg string
 }
 
-const (
-	delimiter = ','
-	quoteChar = '"'
-)
+const quoteChar = '"'
 
 // scanner walks a CSV byte slice one rune at a time, keeping track of the
 // 1-based line and column of whatever it's about to read. Columns are
 // counted in runes, not bytes, so positions stay correct on UTF-8 input.
 type scanner struct {
-	data []byte
-	i    int
-	line int
-	col  int
+	data      []byte
+	i         int
+	line      int
+	col       int
+	delimiter rune
 }
 
-func newScanner(data []byte) *scanner {
-	return &scanner{data: data, line: 1, col: 1}
+func newScanner(data []byte, delimiter rune) *scanner {
+	return &scanner{data: data, line: 1, col: 1, delimiter: delimiter}
 }
 
 func (s *scanner) pos() position {
@@ -69,8 +67,8 @@ func (s *scanner) next() rune {
 // does not stop at the first error: a malformed file usually has more than
 // one thing wrong with it, and a tool that only reports the first makes you
 // fix issues one round-trip at a time.
-func validate(data []byte) []csvError {
-	s := newScanner(data)
+func validate(data []byte, delimiter rune) []csvError {
+	s := newScanner(data, delimiter)
 	var errs []csvError
 
 	expectedFields := -1
@@ -112,7 +110,7 @@ func (s *scanner) scanRow() (int, []csvError) {
 		}
 
 		switch s.peek() {
-		case delimiter:
+		case s.delimiter:
 			s.next()
 		case '\n':
 			s.next()
@@ -144,7 +142,7 @@ func (s *scanner) scanBareField() []csvError {
 	var errs []csvError
 	for !s.eof() {
 		switch s.peek() {
-		case delimiter, '\n', '\r':
+		case s.delimiter, '\n', '\r':
 			return errs
 		case quoteChar:
 			errs = append(errs, csvError{
@@ -194,14 +192,14 @@ func (s *scanner) scanTrailingGarbage() []csvError {
 		return nil
 	}
 	switch s.peek() {
-	case delimiter, '\n', '\r':
+	case s.delimiter, '\n', '\r':
 		return nil
 	}
 
 	pos := s.pos()
 	for !s.eof() {
 		switch s.peek() {
-		case delimiter, '\n', '\r':
+		case s.delimiter, '\n', '\r':
 			return []csvError{{pos: pos, msg: `unexpected data after closing quote (did you forget to escape a quote as ""?)`}}
 		}
 		s.next()

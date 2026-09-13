@@ -2,25 +2,40 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: csvdoctor <file.csv>")
+	delimiterFlag := flag.String("delimiter", ",", `field delimiter; a single character, or "\t" for tab`)
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: csvdoctor [--delimiter <char>] <file.csv>")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		flag.Usage()
 		os.Exit(2)
 	}
 
-	path := os.Args[1]
+	delimiter, err := parseDelimiter(*delimiterFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "csvdoctor: %v\n", err)
+		os.Exit(2)
+	}
+
+	path := flag.Arg(0)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "csvdoctor: %v\n", err)
 		os.Exit(1)
 	}
 
-	errs := validate(data)
+	errs := validate(data, delimiter)
 	if len(errs) == 0 {
 		fmt.Printf("%s: ok\n", path)
 		return
@@ -49,4 +64,23 @@ func printExcerpt(lines [][]byte, pos position) {
 
 	fmt.Printf("    %s | %s\n", lineNo, text)
 	fmt.Printf("    %s | %s^\n", gutter, strings.Repeat(" ", pos.col-1))
+}
+
+// parseDelimiter turns the --delimiter flag value into a rune. "\t" is
+// accepted literally (as two characters) since a real tab is awkward to
+// pass on a command line, and delimiter must not collide with characters
+// the scanner already treats as structural.
+func parseDelimiter(s string) (rune, error) {
+	if s == `\t` {
+		return '\t', nil
+	}
+
+	r, size := utf8.DecodeRuneInString(s)
+	if s == "" || size != len(s) || r == utf8.RuneError {
+		return 0, fmt.Errorf("--delimiter must be a single character, got %q", s)
+	}
+	if r == '\n' || r == '\r' || r == '"' {
+		return 0, fmt.Errorf("--delimiter cannot be %q", r)
+	}
+	return r, nil
 }
