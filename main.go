@@ -11,8 +11,9 @@ import (
 
 func main() {
 	delimiterFlag := flag.String("delimiter", ",", `field delimiter; a single character, or "\t" for tab`)
+	noHeader := flag.Bool("no-header", false, "treat row 1 as data, not a header: use the most common field count as the expected count instead of trusting row 1")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: csvdoctor [--delimiter <char>] <file.csv>")
+		fmt.Fprintln(os.Stderr, "usage: csvdoctor [--delimiter <char>] [--no-header] <file.csv>")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -35,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	errs := validate(data, delimiter)
+	errs := validate(data, delimiter, *noHeader)
 	if len(errs) == 0 {
 		fmt.Printf("%s: ok\n", path)
 		return

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"unicode/utf8"
 )
 
@@ -63,36 +64,83 @@ func (s *scanner) next() rune {
 	return r
 }
 
+type rowInfo struct {
+	fields int
+	pos    position
+}
+
 // validate scans data as CSV and returns every structural problem found. It
 // does not stop at the first error: a malformed file usually has more than
 // one thing wrong with it, and a tool that only reports the first makes you
 // fix issues one round-trip at a time.
-func validate(data []byte, delimiter rune) []csvError {
+//
+// When noHeader is false, row 1 is trusted to set the expected field count,
+// as a header normally would. When noHeader is true there is no reason to
+// trust row 1 over any other row, so the expected count is instead whichever
+// field count occurs most often across the file.
+func validate(data []byte, delimiter rune, noHeader bool) []csvError {
 	s := newScanner(data, delimiter)
 	var errs []csvError
-
-	expectedFields := -1
-	expectedFieldsAt := 0
-	row := 0
+	var rows []rowInfo
 
 	for !s.eof() {
-		row++
 		rowStart := s.pos()
 		fields, rowErrs := s.scanRow()
 		errs = append(errs, rowErrs...)
+		rows = append(rows, rowInfo{fields: fields, pos: rowStart})
+	}
 
-		if expectedFields == -1 {
-			expectedFields = fields
-			expectedFieldsAt = row
-		} else if fields != expectedFields {
-			errs = append(errs, csvError{
-				pos: rowStart,
-				msg: fmt.Sprintf("row has %d field(s), expected %d (set by row %d)", fields, expectedFields, expectedFieldsAt),
-			})
+	if len(rows) > 0 {
+		var expectedFields, expectedFieldsAt int
+		if noHeader {
+			expectedFields, expectedFieldsAt = modeFieldCount(rows)
+		} else {
+			expectedFields, expectedFieldsAt = rows[0].fields, 1
+		}
+
+		for _, r := range rows {
+			if r.fields != expectedFields {
+				errs = append(errs, csvError{
+					pos: r.pos,
+					msg: fmt.Sprintf("row has %d field(s), expected %d (set by row %d)", r.fields, expectedFields, expectedFieldsAt),
+				})
+			}
 		}
 	}
 
+	sort.Slice(errs, func(i, j int) bool {
+		if errs[i].pos.line != errs[j].pos.line {
+			return errs[i].pos.line < errs[j].pos.line
+		}
+		return errs[i].pos.col < errs[j].pos.col
+	})
+
 	return errs
+}
+
+// modeFieldCount returns the field count shared by the most rows, and the
+// number of the first row with that count. Ties go to whichever qualifying
+// count appears earliest in the file.
+func modeFieldCount(rows []rowInfo) (count, atRow int) {
+	freq := make(map[int]int)
+	firstRow := make(map[int]int)
+	for i, r := range rows {
+		freq[r.fields]++
+		if _, seen := firstRow[r.fields]; !seen {
+			firstRow[r.fields] = i + 1
+		}
+	}
+
+	best := rows[0].fields
+	for c, f := range freq {
+		switch {
+		case f > freq[best]:
+			best = c
+		case f == freq[best] && firstRow[c] < firstRow[best]:
+			best = c
+		}
+	}
+	return best, firstRow[best]
 }
 
 // scanRow consumes one record, including its terminating newline if there is

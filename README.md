@@ -22,10 +22,17 @@ It reports all problems in one pass instead of stopping at the first one.
 $ csvdoctor orders.csv
 $ csvdoctor --delimiter ';' orders.csv
 $ csvdoctor --delimiter '\t' orders.tsv
+$ csvdoctor --no-header orders.csv
 ```
 
 The delimiter defaults to a comma. It must be a single character; pass
 `\t` literally (backslash-t) to scan tab-separated files.
+
+By default the expected field count is whatever row 1 has, the way a
+header row normally would. With `--no-header`, row 1 is just a data row
+like any other, so the expected count is instead whichever field count
+occurs most often across the file — a corrupt first row no longer makes
+every other row look wrong.
 
 Given a file like this:
 
@@ -75,5 +82,5 @@ No dependencies outside the standard library.
 
 ## Status
 
-Early. The field-count baseline always comes from the first row; see the
-issues for planned flags.
+Early. Reads from a file argument only; stdin and JSON output are
+planned next.
