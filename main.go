@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"unicode/utf8"
@@ -13,12 +14,13 @@ func main() {
 	delimiterFlag := flag.String("delimiter", ",", `field delimiter; a single character, or "\t" for tab`)
 	noHeader := flag.Bool("no-header", false, "treat row 1 as data, not a header: use the most common field count as the expected count instead of trusting row 1")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: csvdoctor [--delimiter <char>] [--no-header] <file.csv>")
+		fmt.Fprintln(os.Stderr, "usage: csvdoctor [--delimiter <char>] [--no-header] [file.csv]")
+		fmt.Fprintln(os.Stderr, "reads from stdin if no file is given")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	if flag.NArg() != 1 {
+	if flag.NArg() > 1 {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -29,8 +31,14 @@ func main() {
 		os.Exit(2)
 	}
 
-	path := flag.Arg(0)
-	data, err := os.ReadFile(path)
+	path := "<stdin>"
+	var data []byte
+	if flag.NArg() == 1 {
+		path = flag.Arg(0)
+		data, err = os.ReadFile(path)
+	} else {
+		data, err = io.ReadAll(os.Stdin)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "csvdoctor: %v\n", err)
 		os.Exit(1)

@@ -23,7 +23,12 @@ $ csvdoctor orders.csv
 $ csvdoctor --delimiter ';' orders.csv
 $ csvdoctor --delimiter '\t' orders.tsv
 $ csvdoctor --no-header orders.csv
+$ cat orders.csv | csvdoctor
 ```
+
+With no file argument, csvdoctor reads from stdin, so it fits into a
+pipeline instead of only working on files that already exist on disk.
+Diagnostics for stdin input are printed under the path `<stdin>`.
 
 The delimiter defaults to a comma. It must be a single character; pass
 `\t` literally (backslash-t) to scan tab-separated files.
@@ -82,5 +87,4 @@ No dependencies outside the standard library.
 
 ## Status
 
-Early. Reads from a file argument only; stdin and JSON output are
-planned next.
+Early. JSON output is planned next.
